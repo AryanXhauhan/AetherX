@@ -1,0 +1,16 @@
+node_modules/
+# Optional build artifacts
+.next/
+/dist/
+/build/
+# OS files
+.DS_Store
+# Logs
+*.log
+# Env files
+.env
+# IDE settings
+.vscode/
+.idea/
+# Misc
+*.tmp

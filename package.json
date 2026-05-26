@@ -1,0 +1,20 @@
+{
+  "name": "aetherx",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "dev:backend": "npm run dev --workspace=backend",
+    "dev:frontend": "npm run dev --workspace=frontend",
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "db:init": "node backend/scripts/init-db.js",
+    "simulation": "npx tsx frontend/scripts/simulate-terminal.js"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "playwright": "^1.60.0"
+  }
+}

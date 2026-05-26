@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>OMS Browser Integration Test</title>
+  <style>
+    body {font-family: 'Inter', Arial, sans-serif; background:#0d0d0d; color:#e0e0e0; padding:2rem;}
+    pre {background:#1a1a1a; padding:1rem; border-radius:8px; overflow:auto;}
+    .log {margin-bottom:1rem;}
+  </style>
+</head>
+<body>
+  <h1>🧪 OMS Browser Integration Test</h1>
+  <div id="log" class="log"></div>
+  <script>
+    const logEl = document.getElementById('log');
+    const log = (...msg) => {
+      const p = document.createElement('pre');
+      p.textContent = msg.map(m=> typeof m === 'object' ? JSON.stringify(m,null,2) : m).join(' ');
+      logEl.appendChild(p);
+    };
+    const API_URL = 'http://localhost:8080/api/v1';
+    const wait = ms => new Promise(r=>setTimeout(r,ms));
+    async function run() {
+      try {
+        // 1️⃣ Random trader
+        const email = `trader_${Math.random().toString(36).substring(2,10)}@test.local`;
+        const password = 'password123';
+        log('Registering', email);
+        const reg = await fetch(`${API_URL}/auth/register`,{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({email,password})
+        });
+        if(!reg.ok) throw new Error('Register failed: '+await reg.text());
+        const regBody = await reg.json();
+        log('Registered userId:', regBody.user.id);
+
+        // 2️⃣ Login
+        const login = await fetch(`${API_URL}/auth/login`,{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({email,password})
+        });
+        if(!login.ok) throw new Error('Login failed: '+await login.text());
+        const cookie = login.headers.get('set-cookie')?.split(';')[0] || '';
+        log('Session cookie obtained');
+        const authHeaders = {'Content-Type':'application/json','Cookie':cookie};
+
+        // 3️⃣ Place bracket order
+        log('Placing LIMIT BUY bracket order');
+        const orderRes = await fetch(`${API_URL}/orders`,{
+          method:'POST',
+          headers:authHeaders,
+          body:JSON.stringify({
+            symbol:'BTCUSDT',
+            side:'BUY',
+            type:'LIMIT',
+            price:'50000',
+            quantity:'1',
+            linkedOrders:{
+              takeProfit:{price:60000,quantity:1},
+              stopLoss:{stopPrice:45000,quantity:1}
+            }
+          })
+        });
+        const orderData = await orderRes.json();
+        log('Order response', orderData);
+        const orderId = orderData.orderId;
+
+        // 4️⃣ Poll for status changes (up to 30s)
+        const start = Date.now();
+        while(Date.now() - start < 30000) {
+          await wait(3000);
+          const res = await fetch(`${API_URL}/orders`,{headers:{'Cookie':cookie}});
+          const data = await res.json();
+          const all = [...data.active, ...data.history];
+          const target = all.find(o=>o.id===orderId);
+          if(target) {
+            log('Current status for',orderId,':',target.status);
+            if(['FILLED','CANCELED','TRIGGERED'].includes(target.status)) break;
+          } else {
+            log('Order not found yet...');
+          }
+        }
+        log('Test finished');
+      } catch(e){
+        log('❌ Error',e);
+      }
+    }
+    run();
+  </script>
+</body>
+</html>
